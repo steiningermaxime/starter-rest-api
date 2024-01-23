@@ -1,72 +1,52 @@
-const express = require('express')
-const app = express()
-const db = require('@cyclic.sh/dynamodb')
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors'); // Importez le package cors
 
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+// Importez la connexion à la base de données
+const db = require('./database/database');
 
-// #############################################################################
-// This configures static hosting for files in /public that have the extensions
-// listed in the array.
-// var options = {
-//   dotfiles: 'ignore',
-//   etag: false,
-//   extensions: ['htm', 'html','css','js','ico','jpg','jpeg','png','svg'],
-//   index: ['index.html'],
-//   maxAge: '1m',
-//   redirect: false
-// }
-// app.use(express.static('public', options))
-// #############################################################################
+const app = express();
+// Middleware pour ignorer les requêtes favicon
+app.get('/favicon.ico', (req, res) => res.status(204));
 
-// Create or Update an item
-app.post('/:col/:key', async (req, res) => {
-  console.log(req.body)
+// ... le reste de votre code ...
 
-  const col = req.params.col
-  const key = req.params.key
-  console.log(`from collection: ${col} delete key: ${key} with params ${JSON.stringify(req.params)}`)
-  const item = await db.collection(col).set(key, req.body)
-  console.log(JSON.stringify(item, null, 2))
-  res.json(item).end()
-})
+// Configuration du CORS
+// Note : En production, vous devriez remplacer '*' par l'URL de votre frontend
+app.use(cors({
+  origin: '*' // Autorise toutes les origines (à ajuster selon vos besoins)
+}));
 
-// Delete an item
-app.delete('/:col/:key', async (req, res) => {
-  const col = req.params.col
-  const key = req.params.key
-  console.log(`from collection: ${col} delete key: ${key} with params ${JSON.stringify(req.params)}`)
-  const item = await db.collection(col).delete(key)
-  console.log(JSON.stringify(item, null, 2))
-  res.json(item).end()
-})
+// Body parser pour analyser les requêtes JSON
+app.use(bodyParser.json());
 
-// Get a single item
-app.get('/:col/:key', async (req, res) => {
-  const col = req.params.col
-  const key = req.params.key
-  console.log(`from collection: ${col} get key: ${key} with params ${JSON.stringify(req.params)}`)
-  const item = await db.collection(col).get(key)
-  console.log(JSON.stringify(item, null, 2))
-  res.json(item).end()
-})
+// Importez les routes
+const employeeRoutes = require('./src/routes/employee');
+const poubelleRoutes = require('./src/routes/poubelle');
 
-// Get a full listing
-app.get('/:col', async (req, res) => {
-  const col = req.params.col
-  console.log(`list collection: ${col} with params: ${JSON.stringify(req.params)}`)
-  const items = await db.collection(col).list()
-  console.log(JSON.stringify(items, null, 2))
-  res.json(items).end()
-})
+// Utilisez les routes
+app.use('/api/employee', employeeRoutes);
+app.use('/api/poubelle', poubelleRoutes);
 
-// Catch all handler for all other request.
-app.use('*', (req, res) => {
-  res.json({ msg: 'no route handler found' }).end()
-})
+// Gestion des erreurs 404 (Route non trouvée)
+app.use((req, res, next) => {
+  const error = new Error('Route non trouvée');
+  error.status = 404;
+  next(error);
+});
 
-// Start the server
-const port = process.env.PORT || 3000
-app.listen(port, () => {
-  console.log(`index.js listening on ${port}`)
-})
+// Gestionnaire d'erreurs (toutes les erreurs)
+app.use((error, req, res, next) => {
+  res.status(error.status || 500);
+  res.json({
+    erreur: {
+      message: error.message
+    }
+  });
+});
+
+// Démarrez le serveur
+const PORT = process.env.PORT || 3002;
+app.listen(PORT, () => {
+  console.log(`Serveur démarré sur le port ${PORT}`);
+});
